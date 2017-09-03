@@ -11,7 +11,7 @@ CXXFLAGS=-DGITREF=${GITREF} -DGITSTATUS=${GITSTATUS} -L${LIBRARY_DIR} -I${INCLUD
 all: aggregated
 
 aggregated: src/aggregated.cc
-	${CXX} ${CXXFLAGS} -o aggregated src/aggregated.cc
+	${CXX} ${CXXFLAGS} -o aggregated src/aggregated.cc -lboost_program_options
 
 clean:
 	rm -rf *.o
