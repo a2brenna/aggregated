@@ -1,0 +1,3 @@
+A simple daemon to aggregate statistics for scraping by Prometheus.  Supports
+simple values (like the Prometheus Push Gateway), percentiles over time,
+persistent counters.
