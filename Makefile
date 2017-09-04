@@ -10,6 +10,16 @@ CXXFLAGS=-DGITREF=${GITREF} -DGITSTATUS=${GITSTATUS} -L${LIBRARY_DIR} -I${INCLUD
 
 all: aggregated aggregate libaggregate.so libaggregate.a
 
+install: all src/client.h
+	mkdir -p ${DESTDIR}/${PREFIX}/bin
+	cp aggregate ${DESTDIR}/${PREFIX}/bin
+	cp aggregated ${DESTDIR}/${PREFIX}/bin
+	mkdir -p ${DESTDIR}/${PREFIX}/lib
+	cp *.a ${DESTDIR}/${PREFIX}/lib
+	cp *.so ${DESTDIR}/${PREFIX}/lib
+	mkdir -p ${DESTDIR}/${PREFIX}/include/aggregate/
+	cp src/client.h ${DESTDIR}/${PREFIX}/include/aggregate/
+
 aggregated: src/aggregated.cc
 	${CXX} ${CXXFLAGS} -o aggregated src/aggregated.cc -lboost_program_options
 
