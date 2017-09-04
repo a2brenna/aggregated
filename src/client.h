@@ -1,5 +1,5 @@
-#ifndef __CLIENT_H__
-#define __CLIENT_H__
+#ifndef __AGGREGATE_CLIENT_H__
+#define __AGGREGATE_CLIENT_H__
 
 #include <string>
 
@@ -22,6 +22,6 @@ namespace aggregate {
 
     };
 
-};
+}
 
 #endif
