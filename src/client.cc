@@ -50,8 +50,8 @@ namespace aggregate {
 
         ::strncpy(u.key, key.c_str(), 256);
 
-        const int send_status = send(_server_fd, &u, sizeof(u), MSG_NOSIGNAL | MSG_DONTWAIT);
-        assert(send_status == sizeof(u));
+        const int send_status = send(_server_fd, &u, sizeof(u), MSG_NOSIGNAL);
+        //assert(send_status == sizeof(u));
 
         return;
     }
