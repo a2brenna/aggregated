@@ -187,7 +187,7 @@ int main(int argc, char *argv[]){
                 //TODO: check for spaces?
 
                 update.key[255] = '\0';
-                const std::string name(update.key, 256);
+                const std::string name(update.key);
 
                 if(update.type == TYPE_SET){
                     std::cerr << "Setting: " << name << " " << update.data << std::endl;
