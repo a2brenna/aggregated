@@ -2,7 +2,7 @@
 #define __UPDATE_H__
 
 const uint8_t TYPE_SET = 1;
-const uint8_t TYPE_INC = 1;
+const uint8_t TYPE_INC = 2;
 
 struct Update {
     char key[256];
