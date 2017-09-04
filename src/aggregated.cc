@@ -108,6 +108,23 @@ int main(){
     }(CONFIG_UDP_IP, CONFIG_UDP_PORT);
     assert(http_fd >= 0);
 
+    const bool signals_masked = [](){
+        sigset_t mask;
+
+        const auto f = sigfillset(&mask);
+        if(f != 0){
+            return false;
+        }
+
+        const auto m = sigprocmask(SIG_SETMASK, &mask, nullptr);
+        if(m != 0){
+            return false;
+        }
+
+        return true;
+    }();
+    assert(signals_masked);
+
     const int signal_fd = []() {
         sigset_t mask;
         sigemptyset(&mask);
@@ -179,7 +196,7 @@ int main(){
 
         }
         else if(fd_to_handle == signal_fd){
-
+            assert(false);
         }
         else{
             assert(false);
