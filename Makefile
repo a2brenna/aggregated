@@ -21,7 +21,7 @@ install: all src/client.h
 	cp src/client.h ${DESTDIR}/${PREFIX}/include/aggregate/
 
 aggregated: src/aggregated.cc
-	${CXX} ${CXXFLAGS} -o aggregated src/aggregated.cc -lboost_program_options
+	${CXX} ${CXXFLAGS} -o aggregated src/aggregated.cc -lboost_program_options -lsqlite3
 
 aggregate: src/aggregate.cc client.o
 	${CXX} ${CXXFLAGS} -o aggregate src/aggregate.cc client.o -lboost_program_options
