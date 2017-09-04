@@ -171,7 +171,6 @@ int main(){
             Update update;
 
             const int incoming_bytes = read(fd_to_handle, &update, sizeof(Update));
-            assert(incoming_bytes > 0);
 
             if(incoming_bytes == sizeof(Update)){
 
@@ -181,9 +180,12 @@ int main(){
                 const std::string name(update.key, 256);
 
                 if(update.type == TYPE_SET){
+                    std::cerr << "Setting: " << name << " " << update.data << std::endl;
                     data[name] = update.data;
                 }
                 else if(update.type == TYPE_INC){
+                    std::cerr << "Currently: " << name << " " << data[name] << std::endl;
+                    std::cerr << "Incrementing: " << name << " " << update.data << std::endl;
                     data[name] += update.data;
                 }
                 else{
