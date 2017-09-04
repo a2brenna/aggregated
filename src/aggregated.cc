@@ -23,7 +23,7 @@ const size_t MAX_SAFE_UDP = 508;
 
 namespace po = boost::program_options;
 
-int main(){
+int main(int argc, char *argv[]){
 
     std::map<std::string, int64_t> data;
 
@@ -37,6 +37,16 @@ int main(){
         ("http_port" , po::value<std::string>(&CONFIG_HTTP_PORT), "Port to listen for incoming Prometheus scrapes")
         ;
     // clang-format on
+
+	po::variables_map vm;
+    const auto command_line_parameters = po::parse_command_line(argc, argv, desc);
+    po::store(command_line_parameters, vm);
+    po::notify(vm);
+
+    if (vm.count("help")) {
+        std::cout << desc << std::endl;
+        return 0;
+    }
 
     const int udp_fd = [](const std::string &udp_ip, const std::string &udp_port){
 
