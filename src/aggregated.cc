@@ -174,7 +174,36 @@ int main(int argc, char *argv[]){
         }(http_fd, udp_fd, signal_fd, maxfds, fds);
 
         if(fd_to_handle == http_fd){
+            const int client_fd = accept(http_fd, nullptr, NULL);
+            char buff[4096];
+            int request_size = read(client_fd, buff, 4096);
+            assert(request_size > 0);
+            assert(request_size < 4096);
 
+            const std::string request(buff, request_size);
+
+            const std::string response = [](const std::map<std::string, int64_t> &data){
+                std::string response = "# start\n";
+                for(const auto &d: data){
+                    response.append("# TYPE " + d.first + " untyped\n");
+                    response.append(d.first + " " + std::to_string(d.second) + "\n");
+                }
+                response.append("# end\n");
+                return response;
+            }(data);
+
+            std::string response_header = "HTTP/1.1 200 OK\r\n";
+            response_header.append("Content-Type: text/plain; version=0.0.4\r\n");
+            response_header.append("Content-Length: " + std::to_string(response.size()) + "\r\n");
+            response_header.append("\r\n");
+
+            int w1 = write(client_fd, response_header.c_str(), response_header.size());
+            assert(w1 == response_header.size());
+
+            int w2 = write(client_fd, response.c_str(), response.size());
+            assert(w2 == response.size());
+
+            close(client_fd);
         }
         else if(fd_to_handle == udp_fd){
 
