@@ -16,7 +16,7 @@
 
 #include "update.h"
 
-std::string CONFIG_DB_PATH = "aggregator.db";
+std::string CONFIG_DB_PATH = "aggregated.db";
 std::string CONFIG_UDP_IP = "127.0.0.1";
 std::string CONFIG_UDP_PORT = "9101";
 std::string CONFIG_HTTP_IP = "127.0.0.1";
@@ -87,14 +87,11 @@ int main(int argc, char *argv[]){
                 const std::string name(raw_name);
                 const int64_t value = sqlite3_column_int64(compiled_query, 1);
                 data[name] = value;
-                std::cerr << "Loading name: " << name << " " << value << std::endl;
             }
         }while(true);
 
         return data;
     }(db);
-
-    std::cerr << "data.size(): " << data.size() << std::endl;
 
     const std::function<int(const std::string &name, const int64_t &value)> update_db = [](sqlite3 *db){
         const std::string query = "INSERT OR REPLACE INTO aggregates (name, value) VALUES (?, ?)";
@@ -187,7 +184,7 @@ int main(int argc, char *argv[]){
 
         freeaddrinfo(r);
         return fd;
-    }(CONFIG_UDP_IP, CONFIG_UDP_PORT);
+    }(CONFIG_HTTP_IP, CONFIG_HTTP_PORT);
     assert(http_fd >= 0);
 
     const bool signals_masked = [](){
@@ -291,13 +288,10 @@ int main(int argc, char *argv[]){
                 const std::string name(update.key);
 
                 if(update.type == TYPE_SET){
-                    std::cerr << "Setting: " << name << " " << update.data << std::endl;
                     data[name] = update.data;
                     update_db(name, data[name]);
                 }
                 else if(update.type == TYPE_INC){
-                    std::cerr << "Currently: " << name << " " << data[name] << std::endl;
-                    std::cerr << "Incrementing: " << name << " " << update.data << std::endl;
                     data[name] += update.data;
                     update_db(name, data[name]);
                 }
@@ -317,9 +311,6 @@ int main(int argc, char *argv[]){
             assert(false);
         }
 
-        for(const auto &d: data){
-            std::cout << d.first << " " << d.second << std::endl;
-        }
     }
 
     sqlite3_close(db);
