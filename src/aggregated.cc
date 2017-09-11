@@ -185,7 +185,10 @@ int main(int argc, char *argv[]){
             const std::string response = [](const std::map<std::string, int64_t> &data){
                 std::string response = "# start\n";
                 for(const auto &d: data){
-                    response.append("# TYPE " + d.first + " untyped\n");
+                    std::string comment_string = d.first;
+                    const auto brace_pos = comment_string.find("{");
+                    comment_string.erase(brace_pos, std::string::npos);
+                    response.append("# TYPE " + comment_string + " untyped\n");
                     response.append(d.first + " " + std::to_string(d.second) + "\n");
                 }
                 response.append("# end\n");
