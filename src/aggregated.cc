@@ -253,11 +253,23 @@ int main(int argc, char *argv[]){
 
             const std::string response = [](const std::map<std::string, int64_t> &data){
                 std::string response = "# start\n";
+                std::set<std::string> typed;
                 for(const auto &d: data){
-                    std::string comment_string = d.first;
-                    const auto brace_pos = comment_string.find("{");
-                    comment_string.erase(brace_pos, std::string::npos);
-                    response.append("# TYPE " + comment_string + " untyped\n");
+
+                    const std::string comment_string = [](std::string metric_name){
+                        const auto brace_pos = metric_name.find("{");
+                        if( (brace_pos >= 0) && (brace_pos < metric_name.size()) ){
+                            metric_name.erase(brace_pos, std::string::npos);
+                        }
+                        return metric_name;
+                    }(d.first);
+
+                    //Has this metric already had a comment written for it? You can only write one...
+                    if(typed.find(comment_string) == typed.end()){
+                        response.append("# TYPE " + comment_string + " untyped\n");
+                        typed.insert(comment_string);
+                    }
+
                     response.append(d.first + " " + std::to_string(d.second) + "\n");
                 }
                 response.append("# end\n");
