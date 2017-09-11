@@ -12,8 +12,11 @@
 #include <string>
 #include <map>
 
+#include <sqlite3.h>
+
 #include "update.h"
 
+std::string CONFIG_DB_PATH = "aggregated.db";
 std::string CONFIG_UDP_IP = "127.0.0.1";
 std::string CONFIG_UDP_PORT = "9101";
 std::string CONFIG_HTTP_IP = "127.0.0.1";
@@ -25,12 +28,11 @@ namespace po = boost::program_options;
 
 int main(int argc, char *argv[]){
 
-    std::map<std::string, int64_t> data;
-
     // clang-format off
     po::options_description desc("Options");
     desc.add_options()
         ("help", "Produce help message")
+        ("db" , po::value<std::string>(&CONFIG_DB_PATH), "Path to database file")
         ("udp_ip" , po::value<std::string>(&CONFIG_UDP_IP), "IP Address to listen for incoming statistcs")
         ("udp_port" , po::value<std::string>(&CONFIG_UDP_PORT), "Port to listen for incoming statistics")
         ("http_ip" , po::value<std::string>(&CONFIG_HTTP_IP), "IP Address to listen for incoming Prometheus scrapes")
@@ -47,6 +49,73 @@ int main(int argc, char *argv[]){
         std::cout << desc << std::endl;
         return 0;
     }
+
+    sqlite3 *db;
+    const int open_status = sqlite3_open(CONFIG_DB_PATH.c_str(), &db);
+    assert(open_status == 0);
+
+    //Load from stored database
+    std::map<std::string, int64_t> data = [](sqlite3 *db){
+        std::map<std::string, int64_t> data;
+
+        [](sqlite3 *db){
+            const std::string query("CREATE TABLE IF NOT EXISTS aggregates(name PRIMARY KEY, value)");
+            sqlite3_stmt *compiled_query;
+
+            const int prep_status = sqlite3_prepare(db, query.c_str(), query.size(), &compiled_query, nullptr);
+            assert(prep_status == 0);
+
+            const int r = sqlite3_step(compiled_query);
+            assert(r == SQLITE_DONE);
+
+            return;
+        }(db);
+
+        const std::string query("SELECT * FROM aggregates");
+        sqlite3_stmt *compiled_query;
+
+        const int prep_status = sqlite3_prepare(db, query.c_str(), query.size(), &compiled_query, nullptr);
+        assert(prep_status == 0);
+
+        do{
+            const int r = sqlite3_step(compiled_query);
+            if(r == SQLITE_DONE){
+                break;
+            }
+            else{
+                const char *raw_name = (char *)sqlite3_column_text(compiled_query, 0);
+                const std::string name(raw_name);
+                const int64_t value = sqlite3_column_int64(compiled_query, 1);
+                data[name] = value;
+            }
+        }while(true);
+
+        return data;
+    }(db);
+
+    const std::function<int(const std::string &name, const int64_t &value)> update_db = [](sqlite3 *db){
+        const std::string query = "INSERT OR REPLACE INTO aggregates (name, value) VALUES (?, ?)";
+        sqlite3_stmt *compiled_query;
+
+        const int prep_status = sqlite3_prepare(db, query.c_str(), query.size(), &compiled_query, nullptr);
+        assert(prep_status == 0);
+
+        return [db, compiled_query](const std::string &name, const int64_t &value){
+            const int reset_status = sqlite3_reset(compiled_query);
+            assert(reset_status == SQLITE_OK);
+
+            const int name_bind_status = sqlite3_bind_text(compiled_query, 1, name.c_str(), name.size(), SQLITE_STATIC);
+            assert(name_bind_status == SQLITE_OK);
+
+            const int value_bind_status = sqlite3_bind_int64(compiled_query, 2, value);
+            assert(value_bind_status == SQLITE_OK);
+
+            const int exec_status = sqlite3_step(compiled_query);
+            assert(exec_status == SQLITE_DONE);
+
+            return 0;
+        };
+    }(db);
 
     const int udp_fd = [](const std::string &udp_ip, const std::string &udp_port){
 
@@ -115,7 +184,7 @@ int main(int argc, char *argv[]){
 
         freeaddrinfo(r);
         return fd;
-    }(CONFIG_UDP_IP, CONFIG_UDP_PORT);
+    }(CONFIG_HTTP_IP, CONFIG_HTTP_PORT);
     assert(http_fd >= 0);
 
     const bool signals_masked = [](){
@@ -222,13 +291,12 @@ int main(int argc, char *argv[]){
                 const std::string name(update.key);
 
                 if(update.type == TYPE_SET){
-                    std::cerr << "Setting: " << name << " " << update.data << std::endl;
                     data[name] = update.data;
+                    update_db(name, data[name]);
                 }
                 else if(update.type == TYPE_INC){
-                    std::cerr << "Currently: " << name << " " << data[name] << std::endl;
-                    std::cerr << "Incrementing: " << name << " " << update.data << std::endl;
                     data[name] += update.data;
+                    update_db(name, data[name]);
                 }
                 else{
                     assert(false);
@@ -240,16 +308,14 @@ int main(int argc, char *argv[]){
 
         }
         else if(fd_to_handle == signal_fd){
-            assert(false);
+            break;
         }
         else{
             assert(false);
         }
 
-        for(const auto &d: data){
-            std::cout << d.first << " " << d.second << std::endl;
-        }
     }
 
+    sqlite3_close(db);
     return 0;
 }
