@@ -3,7 +3,6 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <arpa/inet.h>
 #include <netdb.h>
 
 #include <signal.h>
@@ -258,64 +257,58 @@ int main(int argc, char *argv[]){
         if(fd_to_handle == http_fd){
             const int client_fd = accept(http_fd, nullptr, NULL);
             char buff[4096];
+            int request_size = read(client_fd, buff, 4096);
 
-            struct sockaddr_in src_addr;
-            socklen_t t;
-            const ssize_t request_size = recvfrom(client_fd, buff, 4096, 0, (struct sockaddr *)&src_addr, &t);
-            if((request_size < 0) || (request_size == 4096)){
-                char buf[16];
-                inet_ntop(AF_INET, &src_addr.sin_addr, buf, 16);
-                const std::string remote_address(buf, 16);
-                std::cout << "Client Request Read Failed: " << request_size << " " << remote_address << std::endl;
-                close(client_fd);
-                continue;
-            }
+            if (request_size > 0){
+                const std::string request(buff, request_size);
 
-            const std::string request(buff, request_size);
+                const std::string response = [](const std::map<std::string, Value> &data){
+                    std::string response = "# start\n";
+                    std::set<std::string> typed;
+                    for(const auto &d: data){
 
-            const std::string response = [](const std::map<std::string, Value> &data){
-                std::string response = "# start\n";
-                std::set<std::string> typed;
-                for(const auto &d: data){
+                        const std::string comment_string = [](std::string metric_name){
+                            const auto brace_pos = metric_name.find("{");
+                            if( (brace_pos >= 0) && (brace_pos < metric_name.size()) ){
+                                metric_name.erase(brace_pos, std::string::npos);
+                            }
+                            return metric_name;
+                        }(d.first);
 
-                    const std::string comment_string = [](std::string metric_name){
-                        const auto brace_pos = metric_name.find("{");
-                        if( (brace_pos >= 0) && (brace_pos < metric_name.size()) ){
-                            metric_name.erase(brace_pos, std::string::npos);
+                        //Has this metric already had a comment written for it? You can only write one...
+                        if(typed.find(comment_string) == typed.end()){
+                            response.append("# TYPE " + comment_string + " untyped\n");
+                            typed.insert(comment_string);
                         }
-                        return metric_name;
-                    }(d.first);
 
-                    //Has this metric already had a comment written for it? You can only write one...
-                    if(typed.find(comment_string) == typed.end()){
-                        response.append("# TYPE " + comment_string + " untyped\n");
-                        typed.insert(comment_string);
+                        if(d.second.tag == Value::INT64_T){
+                            response.append(d.first + " " + std::to_string(d.second.value.i) + "\n");
+                        }
+                        else if(d.second.tag == Value::DOUBLE){
+                            response.append(d.first + " " + std::to_string(d.second.value.d) + "\n");
+                        }
                     }
+                    response.append("# end\n");
+                    return response;
+                }(data);
 
-                    if(d.second.tag == Value::INT64_T){
-                        response.append(d.first + " " + std::to_string(d.second.value.i) + "\n");
-                    }
-                    else if(d.second.tag == Value::DOUBLE){
-                        response.append(d.first + " " + std::to_string(d.second.value.d) + "\n");
-                    }
+                std::string response_header = "HTTP/1.1 200 OK\r\n";
+                response_header.append("Content-Type: text/plain; version=0.0.4\r\n");
+                response_header.append("Content-Length: " + std::to_string(response.size()) + "\r\n");
+                response_header.append("\r\n");
+
+                int w1 = write(client_fd, response_header.c_str(), response_header.size());
+                if(w1 != response_header.size()){
+                    std::cout << "Client Header Write Failed: " << w1 << std::endl;
                 }
-                response.append("# end\n");
-                return response;
-            }(data);
 
-            std::string response_header = "HTTP/1.1 200 OK\r\n";
-            response_header.append("Content-Type: text/plain; version=0.0.4\r\n");
-            response_header.append("Content-Length: " + std::to_string(response.size()) + "\r\n");
-            response_header.append("\r\n");
-
-            int w1 = write(client_fd, response_header.c_str(), response_header.size());
-            if(w1 != response_header.size()){
-                std::cout << "Client Header Write Failed: " << w1 << std::endl;
+                int w2 = write(client_fd, response.c_str(), response.size());
+                if(w2 != response.size()){
+                    std::cout << "Client Response Write Failed: " << w1 << std::endl;
+                }
             }
-
-            int w2 = write(client_fd, response.c_str(), response.size());
-            if(w2 != response.size()){
-                std::cout << "Client Response Write Failed: " << w1 << std::endl;
+            else{
+                //bad request, do nothing
             }
 
             close(client_fd);
