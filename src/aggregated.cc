@@ -282,10 +282,14 @@ int main(int argc, char *argv[]){
             response_header.append("\r\n");
 
             int w1 = write(client_fd, response_header.c_str(), response_header.size());
-            assert(w1 == response_header.size());
+            if(w1 != response_header.size()){
+                std::cout << "Client Header Write Failed: " << w1 << std::endl;
+            }
 
             int w2 = write(client_fd, response.c_str(), response.size());
-            assert(w2 == response.size());
+            if(w2 != response.size()){
+                std::cout << "Client Response Write Failed: " << w1 << std::endl;
+            }
 
             close(client_fd);
         }
