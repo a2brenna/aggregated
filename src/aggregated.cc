@@ -27,6 +27,15 @@ const size_t MAX_SAFE_UDP = 508;
 
 namespace po = boost::program_options;
 
+struct Value {
+    enum {
+        EMPTY,
+        INT64_T,
+        DOUBLE
+    } tag;
+    Number value;
+};
+
 int main(int argc, char *argv[]){
 
     // clang-format off
@@ -56,8 +65,8 @@ int main(int argc, char *argv[]){
     assert(open_status == 0);
 
     //Load from stored database
-    std::map<std::string, int64_t> data = [](sqlite3 *db){
-        std::map<std::string, int64_t> data;
+    std::map<std::string, Value> data = [](sqlite3 *db){
+        std::map<std::string, Value> data;
 
         [](sqlite3 *db){
             const std::string query("CREATE TABLE IF NOT EXISTS aggregates(name PRIMARY KEY, value)");
@@ -87,7 +96,10 @@ int main(int argc, char *argv[]){
                 const char *raw_name = (char *)sqlite3_column_text(compiled_query, 0);
                 const std::string name(raw_name);
                 const int64_t value = sqlite3_column_int64(compiled_query, 1);
-                data[name] = value;
+                struct Value d;
+                d.tag = Value::INT64_T;
+                d.value.i = value;
+                data[name] = d;
             }
         }while(true);
 
@@ -255,12 +267,13 @@ int main(int argc, char *argv[]){
                 inet_ntop(AF_INET, &src_addr.sin_addr, buf, 16);
                 const std::string remote_address(buf, 16);
                 std::cout << "Client Request Read Failed: " << request_size << " " << remote_address << std::endl;
+                close(client_fd);
                 continue;
             }
 
             const std::string request(buff, request_size);
 
-            const std::string response = [](const std::map<std::string, int64_t> &data){
+            const std::string response = [](const std::map<std::string, Value> &data){
                 std::string response = "# start\n";
                 std::set<std::string> typed;
                 for(const auto &d: data){
@@ -279,7 +292,12 @@ int main(int argc, char *argv[]){
                         typed.insert(comment_string);
                     }
 
-                    response.append(d.first + " " + std::to_string(d.second) + "\n");
+                    if(d.second.tag == Value::INT64_T){
+                        response.append(d.first + " " + std::to_string(d.second.value.i) + "\n");
+                    }
+                    else if(d.second.tag == Value::DOUBLE){
+                        response.append(d.first + " " + std::to_string(d.second.value.d) + "\n");
+                    }
                 }
                 response.append("# end\n");
                 return response;
@@ -315,19 +333,45 @@ int main(int argc, char *argv[]){
                 update.key[255] = '\0';
                 const std::string name(update.key);
 
+                //Check that incoming type matches stored type if we have data stored for this name
+                Value v = [](const std::map<std::string, Value> &data, const std::string &name){
+                    if(data.count(name) != 0){
+                        return data.at(name);
+                    }
+                    else{
+                        Value v;
+                        v.tag = Value::EMPTY;
+                        return v;
+                    }
+                }(data, name);
+
                 if(update.type == TYPE_SET){
-                    data[name] = update.data;
-                    update_db(name, data[name]);
+                    if((v.tag == Value::DOUBLE) || (v.tag == Value::EMPTY)){
+                        v.tag = Value::DOUBLE;
+                        v.value.d = update.data.d;
+                        data[name] = v;
+                    }
+                    else{
+                        std::cout << "Type mismatch on: " << name << std::endl;
+                    }
                 }
                 else if(update.type == TYPE_INC){
-                    data[name] += update.data;
-                    update_db(name, data[name]);
+                    if((v.tag == Value::INT64_T) || (v.tag == Value::EMPTY)){
+                        v.tag = Value::INT64_T;
+                        v.value.i = v.value.i + update.data.i;
+                        data[name] = v;
+                        update_db(name, v.value.i);
+                    }
+                    else{
+                        std::cout << "Type mismatch on: " << name << std::endl;
+                    }
                 }
                 else{
                     assert(false);
                 }
             }
             else{
+                std::cout << "Malformed update" << std::endl;
                 continue;
             }
 

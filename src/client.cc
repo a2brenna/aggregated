@@ -40,7 +40,7 @@ namespace aggregate {
 
     }
 
-    void Client::_send(const std::string &key, const uint8_t &type, const int64_t &data){
+    void Client::_send(const std::string &key, const uint8_t &type, const Number &data){
         assert(key.size() < 256);
         assert( (type == TYPE_INC) || (type == TYPE_SET) );
 
@@ -56,13 +56,17 @@ namespace aggregate {
         return;
     }
 
-    void Client::set(const std::string &key, const int64_t &data){
-        _send(key, TYPE_SET, data);
+    void Client::set(const std::string &key, const double &data){
+        Number _data;
+        _data.d = data;
+        _send(key, TYPE_SET, _data);
         return;
     }
 
     void Client::inc(const std::string &key, const int64_t &data){
-        _send(key, TYPE_INC, data);
+        Number _data;
+        _data.i = data;
+        _send(key, TYPE_INC, _data);
         return;
     }
 
