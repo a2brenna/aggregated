@@ -3,6 +3,7 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
 #include <netdb.h>
 
 #include <signal.h>
@@ -245,9 +246,17 @@ int main(int argc, char *argv[]){
         if(fd_to_handle == http_fd){
             const int client_fd = accept(http_fd, nullptr, NULL);
             char buff[4096];
-            int request_size = read(client_fd, buff, 4096);
-            assert(request_size > 0);
-            assert(request_size < 4096);
+
+            struct sockaddr_in src_addr;
+            socklen_t t;
+            const ssize_t request_size = recvfrom(client_fd, buff, 4096, 0, (struct sockaddr *)&src_addr, &t);
+            if((request_size < 0) || (request_size == 4096)){
+                char buf[16];
+                inet_ntop(AF_INET, &src_addr.sin_addr, buf, 16);
+                const std::string remote_address(buf, 16);
+                std::cout << "Client Request Read Failed: " << request_size << " " << remote_address << std::endl;
+                continue;
+            }
 
             const std::string request(buff, request_size);
 
