@@ -19,6 +19,7 @@ install: all src/client.h
 	cp *.so ${DESTDIR}/${PREFIX}/lib
 	mkdir -p ${DESTDIR}/${PREFIX}/include/aggregate/
 	cp src/client.h ${DESTDIR}/${PREFIX}/include/aggregate/
+	cp src/update.h ${DESTDIR}/${PREFIX}/include/aggregate/
 
 aggregated: src/aggregated.cc
 	${CXX} ${CXXFLAGS} -o aggregated src/aggregated.cc -lboost_program_options -lsqlite3
