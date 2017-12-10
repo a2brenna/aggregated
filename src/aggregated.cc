@@ -334,6 +334,7 @@ int main(int argc, char *argv[]){
                     else{
                         Value v;
                         v.tag = Value::EMPTY;
+                        v.value.i = 0;
                         return v;
                     }
                 }(data, name);
