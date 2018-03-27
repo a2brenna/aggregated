@@ -41,3 +41,4 @@ clean:
 	rm -rf *.a
 	rm -rf *.so
 	rm -f aggregated
+	rm -f aggregate
