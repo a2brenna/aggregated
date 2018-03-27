@@ -70,4 +70,17 @@ namespace aggregate {
         return;
     }
 
+    void Dummy::set(const std::string &key, const double &data){
+        (void)key;
+        (void)data;
+        return;
+    }
+
+    void Dummy::inc(const std::string &key, const int64_t &data){
+        (void)key;
+        (void)data;
+        return;
+    }
+
 }
+
