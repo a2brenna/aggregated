@@ -14,6 +14,8 @@
 
 #include <sqlite3.h>
 
+#include <random>
+
 #include "update.h"
 
 std::string CONFIG_DB_PATH = "aggregated.db";
@@ -33,6 +35,11 @@ struct Value {
         DOUBLE
     } tag;
     Number value;
+    enum {
+        COUNTER,
+        SCALAR
+    } type;
+    size_t count;
 };
 
 int main(int argc, char *argv[]){
@@ -235,6 +242,10 @@ int main(int argc, char *argv[]){
         return fds;
     }(http_fd, signal_fd, udp_fd);
 
+    std::default_random_engine entropy;
+    std::uniform_int_distribution<size_t> distribution(0,std::numeric_limits<size_t>::max());
+    auto rand_int = std::bind(distribution, entropy);
+
     while(true){
         const auto fd_to_handle = [](const int &http_fd, const int &udp_fd, const int &signal_fd, const int &maxfds, fd_set fds) {
             const auto s = select(maxfds, &fds, nullptr, nullptr, nullptr);
@@ -306,6 +317,13 @@ int main(int argc, char *argv[]){
                 if(w2 != response.size()){
                     std::cout << "Client Response Write Failed: " << w1 << std::endl;
                 }
+
+                //Clean up our cached data, reset counts to guarantee we use fresher data if it becomes available
+                for(auto &d: data){
+                    if(d.second.type == Value::SCALAR){
+                        d.second.count = 0;
+                    }
+                }
             }
             else{
                 //bad request, do nothing
@@ -335,6 +353,7 @@ int main(int argc, char *argv[]){
                         Value v;
                         v.tag = Value::EMPTY;
                         v.value.i = 0;
+                        v.count = 0;
                         return v;
                     }
                 }(data, name);
@@ -342,7 +361,18 @@ int main(int argc, char *argv[]){
                 if(update.type == TYPE_SET){
                     if((v.tag == Value::DOUBLE) || (v.tag == Value::EMPTY)){
                         v.tag = Value::DOUBLE;
-                        v.value.d = update.data.d;
+                        v.type = Value::SCALAR;
+                        v.count++;
+
+                        //This should select uniformly at random from the incoming data for this stored Value as long as we recieve no more than MAX_SIZET / 2 updates between scrapings
+                        v.value.d = [](const double &new_value, const double &old_value, const size_t &luck){
+                            if(luck == 0){
+                                return new_value;
+                            }
+                            else{
+                                return old_value;
+                            }
+                        }(update.data.d, v.value.d, rand_int() % v.count);
                         data[name] = v;
                     }
                     else{
@@ -352,6 +382,7 @@ int main(int argc, char *argv[]){
                 else if(update.type == TYPE_INC){
                     if((v.tag == Value::INT64_T) || (v.tag == Value::EMPTY)){
                         v.tag = Value::INT64_T;
+                        v.type = Value::COUNTER;
                         v.value.i = v.value.i + update.data.i;
                         data[name] = v;
                         update_db(name, v.value.i);
