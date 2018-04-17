@@ -36,6 +36,9 @@ namespace aggregate {
 
 			return -1;
 		}(r);
+
+        freeaddrinfo(r);
+
 		assert(_server_fd >= 0);
 
     }
