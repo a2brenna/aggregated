@@ -6,7 +6,16 @@
 
 namespace aggregate {
 
-    class Client{
+    class Aggregator{
+
+        public:
+
+            virtual void set(const std::string &key, const double &data) = 0;
+            virtual void inc(const std::string &key, const int64_t &data) = 0;
+
+    };
+
+    class Client : public Aggregator {
 
         public:
 
@@ -20,6 +29,15 @@ namespace aggregate {
             int _server_fd;
 
             void _send(const std::string &key, const uint8_t &type, const Number &data);
+
+    };
+
+    class Dummy : public Aggregator {
+
+        public:
+
+            void set(const std::string &key, const double &data);
+            void inc(const std::string &key, const int64_t &data);
 
     };
 
