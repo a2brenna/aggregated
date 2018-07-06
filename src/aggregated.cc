@@ -227,6 +227,7 @@ int main(int argc, char *argv[]){
         sigset_t mask;
         sigemptyset(&mask);
         sigaddset(&mask, SIGINT);
+        sigaddset(&mask, SIGTERM);
         return signalfd(-1, &mask, 0);
     }();
     assert(signal_fd >= 0);
